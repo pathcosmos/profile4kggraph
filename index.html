@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>철강 제선 공정 지식 그래프</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .controls {
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .control-group label {
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        select {
+            padding: 8px 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
+            background: white;
+            font-size: 14px;
+        }
+        
+        .graph-container {
+            position: relative;
+            height: 700px;
+            background: #ffffff;
+        }
+        
+        #cy {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .info-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            max-width: 300px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .info-panel h3 {
+            margin: 0 0 10px 0;
+            color: #495057;
+            font-size: 1.2em;
+        }
+        
+        .info-panel p {
+            margin: 5px 0;
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+        
+        .legend {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 5px 0;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid #333;
+        }
+        
+        .stats {
+            padding: 20px;
+            background: #f8f9fa;
+            border-top: 2px solid #e9ecef;
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+        }
+        
+        .stat-item {
+            flex: 1;
+        }
+        
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #495057;
+        }
+        
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏭 철강 제선 공정 지식 그래프</h1>
+            <p>고로(Blast Furnace) 제선 공정의 핵심 요소들과 관계를 시각화</p>
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label>레이아웃:</label>
+                <select id="layoutSelect">
+                    <option value="cose">COSE (기본)</option>
+                    <option value="circle">원형</option>
+                    <option value="grid">격자</option>
+                    <option value="concentric">동심원</option>
+                    <option value="breadthfirst">계층형</option>
+                </select>
+            </div>
+            <button onclick="resetLayout()">레이아웃 재설정</button>
+            <button onclick="fitToView()">전체 보기</button>
+            <button onclick="exportGraph()">그래프 내보내기</button>
+        </div>
+        
+        <div class="graph-container">
+            <div id="cy"></div>
+            
+            <div class="info-panel" id="infoPanel">
+                <h3>정보 패널</h3>
+                <p>노드를 클릭하면 상세 정보가 표시됩니다.</p>
+            </div>
+            
+            <div class="legend">
+                <h4>범례</h4>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #FF6B6B;"></div>
+                    <span>원료 (Raw Materials)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #4ECDC4;"></div>
+                    <span>공정 (Process)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #45B7D1;"></div>
+                    <span>장비 (Equipment)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #FFA07A;"></div>
+                    <span>제품 (Product)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #98D8C8;"></div>
+                    <span>부산물 (By-product)</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-value" id="nodeCount">0</div>
+                <div class="stat-label">노드 수</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="edgeCount">0</div>
+                <div class="stat-label">연결 수</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="processCount">0</div>
+                <div class="stat-label">공정 수</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="materialCount">0</div>
+                <div class="stat-label">원료 수</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.23.0/cytoscape.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script>
+        // 제선 공정 지식 그래프 데이터
+        const graphData = {
+            nodes: [
+                // 원료 (Raw Materials)
+                { id: 'iron_ore', label: '철광석\n(Iron Ore)', type: 'raw_material', 
+                  description: '철을 함유한 광물. 주로 적철광(Fe2O3), 자철광(Fe3O4) 등이 사용됨',
+                  composition: 'Fe: 55-65%', temperature: '상온' },
+                { id: 'coke', label: '코크스\n(Coke)', type: 'raw_material',
+                  description: '석탄을 고온에서 건류하여 만든 연료. 환원제 및 열원 역할',
+                  composition: '탄소: 85-90%', temperature: '1000-1200°C' },
+                { id: 'limestone', label: '석회석\n(Limestone)', type: 'raw_material',
+                  description: '용제로 사용되어 불순물을 제거하고 슬래그를 형성',
+                  composition: 'CaCO3: 90-95%', temperature: '800-900°C' },
+                { id: 'hot_air', label: '열풍\n(Hot Air)', type: 'raw_material',
+                  description: '고로 하부에서 공급되는 가열된 공기. 연소를 돕는 역할',
+                  composition: 'O2: 21%, N2: 78%', temperature: '1000-1200°C' },
+                
+                // 공정 (Process)
+                { id: 'charging', label: '장입\n(Charging)', type: 'process',
+                  description: '원료를 고로 상부에 투입하는 공정',
+                  location: '고로 상부', duration: '연속' },
+                { id: 'reduction', label: '환원\n(Reduction)', type: 'process',
+                  description: '철광석의 산화철이 일산화탄소에 의해 환원되는 공정',
+                  temperature: '800-1200°C', reaction: 'Fe2O3 + 3CO → 2Fe + 3CO2' },
+                { id: 'melting', label: '용융\n(Melting)', type: 'process',
+                  description: '환원된 철이 용융되어 선철이 되는 공정',
+                  temperature: '1500-1600°C', location: '고로 하부' },
+                { id: 'slag_formation', label: '슬래그 형성\n(Slag Formation)', type: 'process',
+                  description: '불순물과 용제가 결합하여 슬래그를 형성하는 공정',
+                  temperature: '1400-1500°C', density: '2.5-3.0 g/cm³' },
+                { id: 'tapping', label: '출선\n(Tapping)', type: 'process',
+                  description: '용융된 선철과 슬래그를 고로에서 배출하는 공정',
+                  frequency: '4-6회/일', duration: '30-60분' },
+                
+                // 장비 (Equipment)
+                { id: 'blast_furnace', label: '고로\n(Blast Furnace)', type: 'equipment',
+                  description: '철광석을 환원하여 선철을 생산하는 주요 설비',
+                  height: '80-120m', capacity: '1000-5000m³' },
+                { id: 'hot_stove', label: '열풍로\n(Hot Stove)', type: 'equipment',
+                  description: '고로에 공급할 열풍을 생성하는 설비',
+                  temperature: '1000-1200°C', count: '3-4기' },
+                { id: 'skip_hoist', label: '스킵 호이스트\n(Skip Hoist)', type: 'equipment',
+                  description: '원료를 고로 상부로 운반하는 설비',
+                  capacity: '20-40톤', speed: '3-5m/s' },
+                { id: 'casthouse', label: '출선장\n(Casthouse)', type: 'equipment',
+                  description: '용융된 선철과 슬래그를 처리하는 설비',
+                  runner_length: '200-400m', ladle_capacity: '300-400톤' },
+                
+                // 제품 (Product)
+                { id: 'pig_iron', label: '선철\n(Pig Iron)', type: 'product',
+                  description: '고로에서 생산되는 1차 철 제품. 제강 공정의 원료로 사용',
+                  composition: 'Fe: 93-95%, C: 3-5%', temperature: '1450-1500°C' },
+                
+                // 부산물 (By-product)
+                { id: 'slag', label: '슬래그\n(Slag)', type: 'byproduct',
+                  description: '제선 과정에서 생성되는 부산물. 시멘트 원료로 활용',
+                  composition: 'CaO: 40-45%, SiO2: 30-35%', uses: '시멘트, 도로재' },
+                { id: 'blast_furnace_gas', label: '고로가스\n(BF Gas)', type: 'byproduct',
+                  description: '고로에서 발생하는 가스. 연료로 재활용',
+                  composition: 'CO: 20-25%, CO2: 20-25%, N2: 50-55%', heating_value: '3400-3800 kJ/m³' },
+                { id: 'dust', label: '더스트\n(Dust)', type: 'byproduct',
+                  description: '고로 운영 중 발생하는 분진',
+                  composition: 'Fe: 40-50%, C: 20-30%', treatment: '소결 공정 재활용' }
+            ],
+            
+            edges: [
+                // 원료 → 공정
+                { source: 'iron_ore', target: 'charging', relationship: 'input_to' },
+                { source: 'coke', target: 'charging', relationship: 'input_to' },
+                { source: 'limestone', target: 'charging', relationship: 'input_to' },
+                { source: 'hot_air', target: 'blast_furnace', relationship: 'supplied_to' },
+                
+                // 공정 → 공정
+                { source: 'charging', target: 'reduction', relationship: 'leads_to' },
+                { source: 'reduction', target: 'melting', relationship: 'leads_to' },
+                { source: 'melting', target: 'slag_formation', relationship: 'concurrent_with' },
+                { source: 'melting', target: 'tapping', relationship: 'leads_to' },
+                { source: 'slag_formation', target: 'tapping', relationship: 'leads_to' },
+                
+                // 장비 → 공정
+                { source: 'skip_hoist', target: 'charging', relationship: 'enables' },
+                { source: 'blast_furnace', target: 'reduction', relationship: 'location_of' },
+                { source: 'blast_furnace', target: 'melting', relationship: 'location_of' },
+                { source: 'blast_furnace', target: 'slag_formation', relationship: 'location_of' },
+                { source: 'hot_stove', target: 'hot_air', relationship: 'produces' },
+                { source: 'casthouse', target: 'tapping', relationship: 'location_of' },
+                
+                // 공정 → 제품/부산물
+                { source: 'tapping', target: 'pig_iron', relationship: 'produces' },
+                { source: 'tapping', target: 'slag', relationship: 'produces' },
+                { source: 'blast_furnace', target: 'blast_furnace_gas', relationship: 'produces' },
+                { source: 'blast_furnace', target: 'dust', relationship: 'produces' },
+                
+                // 재활용 관계
+                { source: 'blast_furnace_gas', target: 'hot_stove', relationship: 'fuel_for' },
+                { source: 'dust', target: 'charging', relationship: 'recycled_to' }
+            ]
+        };
+
+        // 노드 타입별 색상 및 스타일 정의
+        const nodeStyles = {
+            raw_material: { color: '#FF6B6B', shape: 'ellipse' },
+            process: { color: '#4ECDC4', shape: 'rectangle' },
+            equipment: { color: '#45B7D1', shape: 'diamond' },
+            product: { color: '#FFA07A', shape: 'star' },
+            byproduct: { color: '#98D8C8', shape: 'triangle' }
+        };
+
+        // Cytoscape 그래프 초기화
+        let cy = cytoscape({
+            container: document.getElementById('cy'),
+            
+            elements: [
+                ...graphData.nodes.map(node => ({
+                    data: { 
+                        id: node.id, 
+                        label: node.label,
+                        type: node.type,
+                        description: node.description,
+                        ...node
+                    }
+                })),
+                ...graphData.edges.map(edge => ({
+                    data: { 
+                        source: edge.source, 
+                        target: edge.target,
+                        relationship: edge.relationship
+                    }
+                }))
+            ],
+            
+            style: [
+                {
+                    selector: 'node',
+                    style: {
+                        'background-color': function(ele) {
+                            return nodeStyles[ele.data('type')].color;
+                        },
+                        'label': 'data(label)',
+                        'text-valign': 'center',
+                        'text-halign': 'center',
+                        'color': '#fff',
+                        'text-outline-width': 2,
+                        'text-outline-color': '#333',
+                        'font-size': '12px',
+                        'font-weight': 'bold',
+                        'width': 80,
+                        'height': 80,
+                        'shape': function(ele) {
+                            return nodeStyles[ele.data('type')].shape;
+                        },
+                        'border-width': 3,
+                        'border-color': '#333',
+                        'text-wrap': 'wrap',
+                        'text-max-width': '70px'
+                    }
+                },
+                {
+                    selector: 'edge',
+                    style: {
+                        'width': 3,
+                        'line-color': '#666',
+                        'target-arrow-color': '#666',
+                        'target-arrow-shape': 'triangle',
+                        'curve-style': 'bezier',
+                        'arrow-scale': 1.2,
+                        'label': 'data(relationship)',
+                        'font-size': '10px',
+                        'text-rotation': 'autorotate',
+                        'text-margin-y': -10,
+                        'color': '#444',
+                        'text-background-color': '#fff',
+                        'text-background-opacity': 0.8,
+                        'text-background-padding': '2px'
+                    }
+                },
+                {
+                    selector: 'node:selected',
+                    style: {
+                        'border-width': 5,
+                        'border-color': '#FFD700',
+                        'background-color': '#FFD700'
+                    }
+                },
+                {
+                    selector: 'edge:selected',
+                    style: {
+                        'line-color': '#FFD700',
+                        'target-arrow-color': '#FFD700',
+                        'width': 5
+                    }
+                }
+            ],
+            
+            layout: {
+                name: 'cose',
+                idealEdgeLength: 100,
+                nodeOverlap: 20,
+                refresh: 20,
+                fit: true,
+                padding: 30,
+                randomize: false,
+                componentSpacing: 100,
+                nodeRepulsion: 400000,
+                edgeElasticity: 100,
+                nestingFactor: 5,
+                gravity: 80,
+                numIter: 1000,
+                initialTemp: 200,
+                coolingFactor: 0.95,
+                minTemp: 1.0
+            },
+            
+            zoomingEnabled: true,
+            userZoomingEnabled: true,
+            panningEnabled: true,
+            userPanningEnabled: true,
+            boxSelectionEnabled: true,
+            selectionType: 'single',
+            touchTapThreshold: 8,
+            desktopTapThreshold: 4,
+            autolock: false,
+            autoungrabify: false,
+            autounselectify: false
+        });
+
+        // 노드 클릭 이벤트
+        cy.on('tap', 'node', function(evt) {
+            const node = evt.target;
+            const data = node.data();
+            
+            const infoPanel = document.getElementById('infoPanel');
+            infoPanel.innerHTML = `
+                <h3>${data.label}</h3>
+                <p><strong>타입:</strong> ${getTypeLabel(data.type)}</p>
+                <p><strong>설명:</strong> ${data.description}</p>
+                ${data.composition ? `<p><strong>구성:</strong> ${data.composition}</p>` : ''}
+                ${data.temperature ? `<p><strong>온도:</strong> ${data.temperature}</p>` : ''}
+                ${data.capacity ? `<p><strong>용량:</strong> ${data.capacity}</p>` : ''}
+                ${data.height ? `<p><strong>높이:</strong> ${data.height}</p>` : ''}
+                ${data.uses ? `<p><strong>용도:</strong> ${data.uses}</p>` : ''}
+                ${data.reaction ? `<p><strong>반응:</strong> ${data.reaction}</p>` : ''}
+            `;
+            
+            // 연결된 노드들 강조
+            const connectedNodes = node.neighborhood().nodes();
+            const connectedEdges = node.neighborhood().edges();
+            
+            cy.elements().removeClass('highlighted');
+            node.addClass('highlighted');
+            connectedNodes.addClass('highlighted');
+            connectedEdges.addClass('highlighted');
+        });
+
+        // 빈 공간 클릭 시 선택 해제
+        cy.on('tap', function(evt) {
+            if (evt.target === cy) {
+                cy.elements().removeClass('highlighted');
+                document.getElementById('infoPanel').innerHTML = `
+                    <h3>정보 패널</h3>
+                    <p>노드를 클릭하면 상세 정보가 표시됩니다.</p>
+                `;
+            }
+        });
+
+        // 타입 라벨 변환 함수
+        function getTypeLabel(type) {
+            const labels = {
+                raw_material: '원료',
+                process: '공정',
+                equipment: '장비',
+                product: '제품',
+                byproduct: '부산물'
+            };
+            return labels[type] || type;
+        }
+
+        // 레이아웃 변경 함수
+        function changeLayout() {
+            const selectedLayout = document.getElementById('layoutSelect').value;
+            
+            let layoutConfig = {
+                name: selectedLayout,
+                fit: true,
+                padding: 30
+            };
+            
+            if (selectedLayout === 'cose') {
+                layoutConfig = {
+                    ...layoutConfig,
+                    idealEdgeLength: 100,
+                    nodeOverlap: 20,
+                    refresh: 20,
+                    randomize: false,
+                    componentSpacing: 100,
+                    nodeRepulsion: 400000,
+                    edgeElasticity: 100,
+                    nestingFactor: 5,
+                    gravity: 80,
+                    numIter: 1000,
+                    initialTemp: 200,
+                    coolingFactor: 0.95,
+                    minTemp: 1.0
+                };
+            } else if (selectedLayout === 'concentric') {
+                layoutConfig.concentric = function(node) {
+                    const type = node.data('type');
+                    const typeOrder = {
+                        raw_material: 3,
+                        process: 2,
+                        equipment: 1,
+                        product: 0,
+                        byproduct: 0
+                    };
+                    return typeOrder[type] || 0;
+                };
+            } else if (selectedLayout === 'breadthfirst') {
+                layoutConfig.roots = '#iron_ore, #coke, #limestone';
+                layoutConfig.directed = true;
+            }
+            
+            cy.layout(layoutConfig).run();
+        }
+
+        // 컨트롤 함수들
+        function resetLayout() {
+            changeLayout();
+        }
+
+        function fitToView() {
+            cy.fit();
+        }
+
+        function exportGraph() {
+            const png64 = cy.png();
+            const link = document.createElement('a');
+            link.download = 'steel_blast_furnace_graph.png';
+            link.href = png64;
+            link.click();
+        }
+
+        // 통계 업데이트 함수
+        function updateStats() {
+            const nodes = cy.nodes();
+            const edges = cy.edges();
+            
+            document.getElementById('nodeCount').textContent = nodes.length;
+            document.getElementById('edgeCount').textContent = edges.length;
+            
+            const processCounts = nodes.filter(node => node.data('type') === 'process').length;
+            const materialCounts = nodes.filter(node => node.data('type') === 'raw_material').length;
+            
+            document.getElementById('processCount').textContent = processCounts;
+            document.getElementById('materialCount').textContent = materialCounts;
+        }
+
+        // 강조 스타일 추가
+        cy.style().selector('.highlighted').style({
+            'border-width': 5,
+            'border-color': '#FFD700',
+            'line-color': '#FFD700',
+            'target-arrow-color': '#FFD700',
+            'source-arrow-color': '#FFD700',
+            'width': 5
+        }).update();
+
+        // 이벤트 리스너 등록
+        document.getElementById('layoutSelect').addEventListener('change', changeLayout);
+
+        // 초기 통계 업데이트
+        updateStats();
+
+        // 초기 레이아웃 적용
+        cy.ready(function() {
+            cy.layout({ name: 'cose', fit: true, padding: 30 }).run();
+        });
+    </script>
+</body>
+</html>
